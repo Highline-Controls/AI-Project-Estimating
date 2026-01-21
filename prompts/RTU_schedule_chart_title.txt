@@ -1,0 +1,1 @@
+Return the title of the schedule for RTU's. The response should be the title of the schedule and nothing else.
