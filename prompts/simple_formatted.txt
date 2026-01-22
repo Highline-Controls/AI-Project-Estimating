@@ -7,20 +7,3 @@ Do the systems described use bacnet communication protocols?
 Is the software "Tridium Niagara" mentioned?
 
 Format your response as a JSON object with the following Format. Answers should be True for Yes, False for No.
-
-{
-    Questions_Answers: [
-        {
-            Question: "Is our company, JP Certified or Highline mentioned?",
-            Answer: ""    
-        },
-        {
-            Question: "Do the systems described use bacnet communication protocols?",
-            Answer: ""    
-        },
-        {
-            Question: "Is the software "Tridium Niagara" mentioned?",
-            Answer: ""    
-        }
-    ]
-}

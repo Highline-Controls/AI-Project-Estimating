@@ -1,0 +1,35 @@
+Response 1:
+{
+    "Questions_Answers": [
+        {
+            "Question": "Is our company, JP Certified or Highline mentioned?",
+            "Answer": false
+        },
+        {
+            "Question": "Do the systems described use bacnet communication protocols?",
+            "Answer": true
+        },
+        {
+            "Question": "Is the software \"Tridium Niagara\" mentioned?",
+            "Answer": true
+        }
+    ]
+}
+
+Response 2:
+{
+    "Questions_Answers": [
+        {
+            "Question": "Is our company, JP Certified or Highline mentioned?",
+            "Answer": false
+        },
+        {
+            "Question": "Do the systems described use bacnet communication protocols?",
+            "Answer": true
+        },
+        {
+            "Question": "Is the software \"Tridium Niagara\" mentioned?",
+            "Answer": true
+        }
+    ]
+}
