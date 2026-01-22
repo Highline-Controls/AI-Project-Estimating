@@ -1,0 +1,7 @@
+Notes on observations while testing
+
+1. What if Chatgpt returns something that is not a valid JSON?
+2. What happens if during checksum_three the third response matches the incorrect one?
+3. Does every request to ChatGPT need to be validated?
+4. What if the question returned in the ChatGPT response does not match the original question exactly?
+    Seems like the matching logic will fail then
