@@ -144,14 +144,14 @@ if __name__ == "__main__":
         for qa in simple_qs_json["Questions_Answers"]:
             output_file.write(f"Q: {qa['Question']}\nA: {qa['Answer']}\n\n")
 
-    # rtu_schedule_title = prompt_chatgpt(rtu_schedule_prompt)
-    # rtu_info_prompt = rtu_info_prompt.replace("{RTU Schedule Table}", rtu_schedule_title)
-    # rtu_info = prompt_chatgpt(rtu_info_prompt)
-    # rtu_info_json = json.loads(rtu_info)
-    # print("RTU Info Response:")
-    # print(rtu_info_json)
+    rtu_schedule_title = prompt_chatgpt(rtu_schedule_prompt)
+    rtu_info_prompt = rtu_info_prompt.replace("{RTU Schedule Table}", rtu_schedule_title)
+    rtu_info = prompt_chatgpt(rtu_info_prompt)
+    rtu_info_json = json.loads(rtu_info)
+    print("RTU Info Response:")
+    print(rtu_info_json)
 
-    # with open("Final Output.txt", "a") as output_file:
-    #     output_file.write("RTU Information:\n")
-    #     for qa in rtu_info_json["Questions_Answers"]:
-    #         output_file.write(f"Q: {qa['Question']}\nA: {qa['Answer']}\n\n")
+    with open("Final Output.txt", "a") as output_file:
+        output_file.write("RTU Information:\n")
+        for qa in rtu_info_json["Questions_Answers"]:
+            output_file.write(f"Q: {qa['Question']}\nA: {qa['Answer']}\n\n")
