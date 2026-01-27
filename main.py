@@ -5,7 +5,7 @@ import os
 import base64
 
 # Create a file with the Files API
-def create_file(pdf_path):
+def create_file(pdf_path: str) -> None:
     # Loading PDF image
     pdf_path = "Mechanical Plans\\Wedgewood Permit Set - Mechanical.pdf"
     with open(pdf_path, "rb") as pdf_file:
@@ -24,8 +24,15 @@ def create_file(pdf_path):
 
 #create_file(pdf_path)
 
-def prompt_chatgpt(prompt_text, res_obj):
+def prompt_chatgpt(prompt_text: str, res_obj: list) -> str:
     res_obj_str = json.dumps(res_obj)
+
+    #print(type(res_obj))
+    #print(res_obj)
+    for qa in res_obj:
+        questions = '\n' + qa['Question']
+
+    prompt_text = prompt_text.replace('{Questions}', questions)
 
     # Sending request to OpenAI
     print("Sending request to OpenAI...")
@@ -44,10 +51,12 @@ def prompt_chatgpt(prompt_text, res_obj):
             }
         ]
     )
-    print(response.output_text)
+    #print(response.output_text)
     return response.output_text
 
-def checksum_two(response1, response2, prompt_text, res_obj):
+def checksum_two(response1: list, response2: list) -> tuple:
+    print("Starting checksum_two...")
+
     verified_qa = []
     mismatch_qa = []
     # print the type of response1
@@ -65,19 +74,10 @@ def checksum_two(response1, response2, prompt_text, res_obj):
             print(f"Mismatch QA: {qa1['Question']} - {qa1['Answer']}")
             mismatch_qa.append(qa1)
 
-    # if len(mismatch_qa) > 0:
-    #     print(f"Found {len(mismatch_qa)} mismatched QAs.")
-    #     #response3 = prompt_chatgpt(prompt_text, json.dumps(mismatch_qa))
-    #     for qa3 in response3.Questions_Answers:
-    #         for qa_mismatch in mismatch_qa:
-    #             if qa3.Question == qa_mismatch.Question and qa3.Answer == qa_mismatch.Answer:
-    #                 print(f"Updated QA: {qa3.Question} - {qa3.Answer}")
-    #                 verified_qa.append(qa3)
-    #                 break
+    return verified_qa, mismatch_qa
 
-    return verified_qa
-
-def checksum_three(response1, response2, new_response):
+def checksum_three(response1: list, response2: list, new_response: list) -> list:
+    print("Starting checksum_three...")
     verified_qa = []
     for new_qa in new_response:
         for qa1 in response1:
@@ -91,7 +91,7 @@ def checksum_three(response1, response2, new_response):
                     break
     return verified_qa
 
-def chatgpt_checksum(prompt_text, res_obj):
+def chatgpt_checksum(prompt_text: str, res_obj: list) -> list:
     response1 = json.loads(prompt_chatgpt(prompt_text, res_obj))
     response2 = json.loads(prompt_chatgpt(prompt_text, res_obj))
 
@@ -102,56 +102,69 @@ def chatgpt_checksum(prompt_text, res_obj):
         comparison_file.write("\n\nResponse 2:\n")
         comparison_file.write(json.dumps(response2, indent=4))
 
-    verified_qa = checksum_two(response1, response2, prompt_text, res_obj)
+    verified_qa, mismatch_qa = checksum_two(response1, response2)
+
+    if len(mismatch_qa) > 0:
+        print(f"Found {len(mismatch_qa)} mismatched QAs. Requesting new responses from ChatGPT...")
+        new_response = json.loads(prompt_chatgpt(prompt_text, mismatch_qa))
+        verified_qa += checksum_three(response1, response2, new_response)
 
     return verified_qa
 
 if __name__ == "__main__":
-
     print("Starting script...")
-    print("Loading configuration...")
+
     # Configuration
+    print("Loading configuration...")
     load_dotenv()
     OPENAI_API_KEY=os.getenv('OPENAI_API_KEY')
     client = OpenAI(api_key=OPENAI_API_KEY)
 
     # Loading prompt
     prompt_dir = "prompts/"
-    # prompt_path = "D:\\Pat\\Documents\\OneDrive\\Documents\\Repos\\Highline-AI-Design-plans\\prompts\\simple.txt"
     simple_qs_path = prompt_dir + "simple_formatted.txt"
     rtu_schedule_prompt_path = prompt_dir + "RTU_schedule_chart_title.txt"
     rtu_info_prompt_path = prompt_dir + "RTU_info.txt"
+    simple_qs_json_path = prompt_dir + "simple_formatted.json"
+    rtu_schedule_json_path = prompt_dir + "RTU_schedule_chart_title.json"
+    rtu_info_json_path = prompt_dir + "RTU_info.json"
 
-    with open(simple_qs_path, "r") as prompt_file:
-        simple_qs_prompt = prompt_file.read()
+    with open(simple_qs_path, "r") as file:
+        simple_qs_prompt = file.read()
 
-    with open(rtu_schedule_prompt_path, "r") as prompt_file:
-        rtu_schedule_prompt = prompt_file.read()
+    with open(rtu_schedule_prompt_path, "r") as file:
+        rtu_schedule_prompt = file.read()
 
-    with open(rtu_info_prompt_path, "r") as prompt_file:
-        rtu_info_prompt = prompt_file.read()
+    with open(rtu_info_prompt_path, "r") as file:
+        rtu_info_prompt = file.read()
 
-    with open("prompts/simple_formatted.json", "r") as res_file:
-        simple_qs_res = json.load(res_file)
+    with open(rtu_schedule_json_path, "r") as file:
+        rtu_schedule_res = json.loads(file.read())
+
+    with open(rtu_info_json_path, "r") as file:
+        rtu_info_res = json.loads(file.read())
+
+    with open(simple_qs_json_path, "r") as file:
+        simple_qs_res = json.loads(file.read())
 
     # Simple question prompts
     verified_qs = chatgpt_checksum(simple_qs_prompt, simple_qs_res)
-    simple_qs_json = json.loads(verified_qs)
-    print("Simple Questions Response:")
-    print(simple_qs_json)
+    #simple_qs_json = json.loads(verified_qs)
+    #print("Simple Questions Response:")
+    #print(verified_qs)
 
-    with open("answers/test.txt", "w") as output_file:
-        for qa in simple_qs_json["Questions_Answers"]:
+    with open("Final Output.txt", "w") as output_file:
+        for qa in verified_qs:
             output_file.write(f"Q: {qa['Question']}\nA: {qa['Answer']}\n\n")
 
-    rtu_schedule_title = prompt_chatgpt(rtu_schedule_prompt)
-    rtu_info_prompt = rtu_info_prompt.replace("{RTU Schedule Table}", rtu_schedule_title)
-    rtu_info = prompt_chatgpt(rtu_info_prompt)
-    rtu_info_json = json.loads(rtu_info)
-    print("RTU Info Response:")
-    print(rtu_info_json)
+    rtu_schedule_title = chatgpt_checksum(rtu_schedule_prompt, rtu_schedule_res)
+    rtu_info_prompt = rtu_info_prompt.replace("{RTU Schedule Table}", rtu_schedule_title[0]['Answer'])
+    rtu_info = chatgpt_checksum(rtu_info_prompt, rtu_info_res)
+    # rtu_info_json = json.loads(rtu_info)
+    # print("RTU Info Response:")
+    # print(rtu_info_json)
 
     with open("Final Output.txt", "a") as output_file:
         output_file.write("RTU Information:\n")
-        for qa in rtu_info_json["Questions_Answers"]:
+        for qa in rtu_info:
             output_file.write(f"Q: {qa['Question']}\nA: {qa['Answer']}\n\n")
