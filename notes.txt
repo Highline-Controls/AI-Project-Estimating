@@ -5,3 +5,9 @@ Notes on observations while testing
 3. Does every request to ChatGPT need to be validated?
 4. What if the question returned in the ChatGPT response does not match the original question exactly?
     Seems like the matching logic will fail then
+
+Answers:
+RTU units: 8
+RTU CFM: 44000
+VRF Fan Coil Units: 54
+VRF Fan Coil CFM: 49540

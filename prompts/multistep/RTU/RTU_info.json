@@ -1,0 +1,13 @@
+{
+    "order": 2,
+    "res_obj": [
+        {
+            "Question": "How many RTU's are listed in the plans",
+            "Answer": ""
+        },
+        {
+            "Question": "What is the total CFM of all the RTU's?",
+            "Answer": ""
+        }
+    ]
+}

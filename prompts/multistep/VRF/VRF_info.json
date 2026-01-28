@@ -1,0 +1,13 @@
+{
+    "order": 2,
+    "res_obj": [
+        {
+            "Question": "How many VRF fan coil units are listed in the plans",
+            "Answer": ""
+        },
+        {
+            "Question": "What is the total CFM of all the VRF fan coil units?",
+            "Answer": ""
+        }
+    ]
+}
