@@ -1,5 +1,5 @@
 You are a general contractor who specializes in reading mechanical plans.
-Read the uploaded set of plans and specifically focus on the table with title {RTU Schedule Table}.
+Read the uploaded set of plans and specifically focus on the table with title {prev_answer}.
 
 {Questions}
 
