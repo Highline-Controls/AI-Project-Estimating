@@ -5,11 +5,32 @@ from dotenv import load_dotenv
 import os
 import base64
 from prompt import Prompt
+import logging
+from datetime import datetime
+
+# logfile helper
+def setup_logger():
+    os.makedirs("logs", exist_ok=True)
+
+    run_ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    log_path = f"logs/run_{run_ts}.log"
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(message)s",
+        handlers=[
+            logging.FileHandler(log_path, encoding="utf-8"),
+            logging.StreamHandler()  #for printing to terminal
+        ]
+    )
+
+    logging.info("Log file created at %s", log_path)
+    return log_path
 
 # Create a file with the Files API
 def create_file(pdf_path: str) -> None:
     # Loading PDF image
-    pdf_path = "Mechanical Plans\\Wedgewood Permit Set - Mechanical.pdf"
+    
     with open(pdf_path, "rb") as pdf_file:
         b64_pdf = base64.b64encode(pdf_file.read()).decode('utf-8')
 
@@ -19,12 +40,11 @@ def create_file(pdf_path: str) -> None:
             purpose="user_data"
         )
         file_id = result.id
-        print(f"file id: {file_id}")
+        logging.info(f"file id: {file_id}")
     
     with open("pdf_file_id.txt", "w") as id_file:
         id_file.write(file_id)
 
-#create_file(pdf_path)
 
 def prompt_chatgpt(prompt: Prompt) -> str:
     res_obj_str = json.dumps(prompt.res)
@@ -38,9 +58,9 @@ def prompt_chatgpt(prompt: Prompt) -> str:
     prompt_text = prompt.text.replace('{Questions}', questions)
 
     # Sending request to OpenAI
-    print("Sending request to OpenAI...")
+    logging.info("Sending request to OpenAI...")
     response = client.responses.create(
-        model="gpt-5",
+        model="gpt-5-nano",
         input = [
             {
                 "role": "user",
@@ -48,17 +68,16 @@ def prompt_chatgpt(prompt: Prompt) -> str:
                     {   "type": "input_text", "text": prompt_text + '\n' + res_obj_str },
                     {
                         "type": "input_file",
-                        "file_id": "file-FLSnzYscmWHopF1DJzt8EZ"
+                        "file_id": "file-5NTMs8FPiWXpE2A5Hx3P2S"
                     }
                 ]
             }
         ]
     )
-    #print(response.output_text)
     return response.output_text
 
 def checksum_two(response1: list, response2: list) -> tuple:
-    print("Starting checksum_two...")
+    logging.info("Starting checksum_two...")
 
     verified_qa = []
     mismatch_qa = []
@@ -69,18 +88,18 @@ def checksum_two(response1: list, response2: list) -> tuple:
         for qa2 in response2:
             if qa1['Question'] == qa2['Question'] and qa1['Answer'] == qa2['Answer']:
                 # If the question and answer match in both responses, add to verified_qa
-                print(f"Verified QA: {qa1['Question']} - {qa1['Answer']}")
+                logging.info("[CHECKSUM_TWO] Verified: %s -> %s", qa1["Question"], qa1["Answer"])
                 verified_qa.append(qa1)
                 break
         # If no matching QA is found in response2, add to mismatch_qa
         else:
-            print(f"Mismatch QA: {qa1['Question']} - {qa1['Answer']}")
+            logging.info("[CHECKSUM_TWO] Mismatch: %s -> %s", qa1["Question"], qa1["Answer"])
             mismatch_qa.append(qa1)
 
     return verified_qa, mismatch_qa
 
 def checksum_three(response1: list, response2: list, new_response: list) -> list:
-    print("Starting checksum_three...")
+    logging.info("[CHECKSUM_THREE] tie-breaker compare")
     verified_qa = []
     for new_qa in new_response:
         for qa1 in response1:
@@ -95,10 +114,20 @@ def checksum_three(response1: list, response2: list, new_response: list) -> list
     return verified_qa
 
 def chatgpt_checksum(prompt: Prompt) -> list:
-    response1 = json.loads(prompt_chatgpt(prompt))
-    response2 = json.loads(prompt_chatgpt(prompt))
+    logging.info("=== CHECKSUM START ===")
 
-    # Testing: Write response1 and response2 to a file forcomparison
+    # first call
+    logging.info("[CALL 1] prompt_chatgpt -> response1")
+    raw1 = prompt_chatgpt(prompt)
+    logging.info("[CALL 1 OUTPUT] %s", raw1)
+    response1 = json.loads(raw1)
+
+    # second call
+    logging.info("[CALL 2] prompt_chatgpt -> response2")
+    raw2 = prompt_chatgpt(prompt)
+    logging.info("[CALL 2 OUTPUT] %s", raw2)
+    response2 = json.loads(raw2)
+
     with open("validation/checksum_comparison.txt", "w") as comparison_file:
         comparison_file.write("Response 1:\n")
         comparison_file.write(json.dumps(response1, indent=4))
@@ -108,11 +137,16 @@ def chatgpt_checksum(prompt: Prompt) -> list:
     verified_qa, mismatch_qa = checksum_two(response1, response2)
 
     if len(mismatch_qa) > 0:
-        print(f"Found {len(mismatch_qa)} mismatched QAs. Requesting new responses from ChatGPT...")
-        prompt = Prompt(prompt.text, mismatch_qa)
-        new_response = json.loads(prompt_chatgpt(prompt))
-        verified_qa += checksum_three(response1, response2, new_response)
+        logging.info("[CHECKSUM_TWO] Found %d mismatched QAs -> running checksum_three", len(mismatch_qa))
 
+        prompt_mismatch = Prompt(prompt.text, mismatch_qa)
+
+        logging.info("[CALL 3] prompt_chatgpt -> response3 (mismatch-only)")
+        raw3 = prompt_chatgpt(prompt_mismatch)
+        logging.info("[CALL 3 OUTPUT] %s", raw3)
+        new_response = json.loads(raw3)
+
+        verified_qa += checksum_three(response1, response2, new_response)
     return verified_qa
 
 def load_simple_prompts() -> Prompt:
@@ -142,7 +176,7 @@ def load_multistep_prompts() -> list[list]:
         for txt in uniq_prompts:
             json_path = txt.with_suffix('.json')
             if not json_path.exists():
-                print(f"Warning: JSON file {json_path} does not exist for prompt {txt}")
+                logging.info(f"Warning: JSON file {json_path} does not exist for prompt {txt}")
             with open(txt, "r") as file:
                 prompt_text = file.read()
             with open(json_path, "r") as file:
@@ -154,13 +188,18 @@ def load_multistep_prompts() -> list[list]:
     return multistep_prompts
 
 if __name__ == "__main__":
-    print("Starting script...")
+    log_path = setup_logger()
+    logging.info("Starting script...")
 
     # Configuration
-    print("Loading configuration...")
+    logging.info("Loading configuration...")
     load_dotenv()
     OPENAI_API_KEY=os.getenv('OPENAI_API_KEY')
     client = OpenAI(api_key=OPENAI_API_KEY)
+
+    # pdf_path = "Wedgewood Permit Set - Mechanical.pdf"
+    # create_file(pdf_path)
+
 
     # Loading prompt
 
@@ -178,6 +217,8 @@ if __name__ == "__main__":
     #         output_file.write(f"Q: {qa['Question']}\nA: {qa['Answer']}\n\n")
 
     # Multistep Prompt
+
+
     multistep_prompts = load_multistep_prompts()
     multistep_QAs = []
 
@@ -191,11 +232,11 @@ if __name__ == "__main__":
             answer = chatgpt_checksum(current_prompt)
             multistep_QAs.append(answer)
 
-    print("Multistep Questions Response:")
-    print(multistep_QAs)
+    logging.info("Multistep Questions Response:")
+    logging.info(multistep_QAs)
     with open("Final Output.txt", "a") as output_file:
         for prompt_chain in multistep_QAs:
-            print(f"prompt_chain: {prompt_chain}")
+            logging.info(f"prompt_chain: {prompt_chain}")
             for qa in prompt_chain:
-                print(f"qa: {qa}")
+                logging.info(f"qa: {qa}")
                 output_file.write(f"Q: {qa['Question']}\nA: {qa['Answer']}\n\n")
