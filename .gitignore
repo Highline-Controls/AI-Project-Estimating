@@ -8,3 +8,7 @@ __pycache__/
 logging_threads.pid
 
 *.pdf
+
+logs/
+validation/
+Final Output.txt
