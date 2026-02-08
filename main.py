@@ -99,19 +99,24 @@ def checksum_two(response1: list, response2: list) -> tuple:
 
     return verified_qa, mismatch_qa
 
+# TODO: Need to handle situation where all 3 respones are different. This only works when the probability of accuracy
+# is very high, otherwise it can easily get the wrong answer. In particular, math, like adding up the RTU CFM has low accuracy.
 def checksum_three(response1: list, response2: list, new_response: list) -> list:
     logging.info("[CHECKSUM_THREE] tie-breaker compare")
     verified_qa = []
     for new_qa in new_response:
         for qa1 in response1:
             if new_qa['Question'] == qa1['Question'] and new_qa['Answer'] == qa1['Answer']:
+                logging.info("[CHECKSUM_THREE] Match with Response 1: %s -> %s", new_qa["Question"], new_qa["Answer"])
                 verified_qa.append(new_qa)
-                break
+                continue
         else:
             for qa2 in response2:
                 if new_qa['Question'] == qa2['Question'] and new_qa['Answer'] == qa2['Answer']:
+                    logging.info("[CHECKSUM_THREE] Match with Response 2: %s -> %s", new_qa["Question"], new_qa["Answer"])
                     verified_qa.append(new_qa)
-                    break
+                    continue
+        logging.info("[CHECKSUM_THREE] No match: %s -> %s", new_qa["Question"], new_qa["Answer"])
     return verified_qa
 
 def chatgpt_checksum(prompt: Prompt) -> list:
