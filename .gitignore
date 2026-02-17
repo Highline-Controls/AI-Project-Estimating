@@ -12,3 +12,4 @@ logging_threads.pid
 logs/
 validation/
 Final Output.txt
+.DS_Store
