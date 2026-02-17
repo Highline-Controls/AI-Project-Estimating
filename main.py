@@ -214,6 +214,9 @@ if __name__ == "__main__":
     # Simple question prompts
     simple_prompts = load_simple_prompts()
     verified_qs = chatgpt_checksum(simple_prompts)
+    # simple_qs_json = json.loads(verified_qs)
+    # print("Simple Questions Response:")
+    # print(verified_qs)
 
     with open("Final Output.txt", "w") as output_file:
         for qa in verified_qs:
