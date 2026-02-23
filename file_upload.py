@@ -17,8 +17,8 @@ def create_file(pdf_path: str) -> None:
         file_id = result.id
         print(f"file id: {file_id}")
     
-    with open("pdf_file_id.txt", "w") as id_file:
-        id_file.write(file_id)
+    with open("pdf_file_id.txt", "a") as id_file:
+        id_file.write(file_id + "\n")
 
 # Configuration
 print("Loading configuration...")
