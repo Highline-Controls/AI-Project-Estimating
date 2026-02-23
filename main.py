@@ -27,6 +27,11 @@ def setup_logger():
     logging.info("Log file created at %s", log_path)
     return log_path
 
+def log_prompt(msg: str) -> None:
+    with open("logs/prompts/prompt_log.log", "a", encoding="utf-8") as prompt_log:
+        prompt_log.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | {msg}\n")
+    return
+
 # Create a file with the Files API
 def create_file(pdf_path: str) -> None:
     # Loading PDF image
@@ -46,7 +51,7 @@ def create_file(pdf_path: str) -> None:
         id_file.write(file_id)
 
 
-def prompt_chatgpt(prompt: Prompt) -> str:
+def prompt_chatgpt(prompt: Prompt) -> list[dict[str, str]]:
     res_obj_str = json.dumps(prompt.res)
     questions = ''
     # Format questions in response object
@@ -58,6 +63,7 @@ def prompt_chatgpt(prompt: Prompt) -> str:
     full_prompt = prompt_text + '\n' + res_obj_str
 
     # Sending request to OpenAI
+    log_prompt(full_prompt)
     logging.info("Sending request to ChatGPT...")
     response = client.responses.create(
         model = MODEL,
@@ -75,8 +81,17 @@ def prompt_chatgpt(prompt: Prompt) -> str:
         ]
     )
 
-    chat_res = response.output_text
-    logging.info(f"ChatGPT response: {chat_res}")
+    log_prompt(f"ChatGPT response: {response.output_text}")
+    try:
+        chat_res = json.loads(response.output_text)
+    except json.JSONDecodeError as e:
+        logging.error("Error decoding ChatGPT response to JSON: %s", e)
+        raise
+
+    logging.info(f"ChatGPT response...")
+    for qa in chat_res:
+        logging.info(qa["Question"])
+        logging.info(qa["Answer"])
     return chat_res
 
 def checksum_two(response1: list, response2: list) -> tuple:
@@ -124,11 +139,11 @@ def chatgpt_checksum(prompt: Prompt) -> list:
 
     # first call
     logging.info("[CALL 1] prompt_chatgpt -> response1")
-    response1 = json.loads(prompt_chatgpt(prompt))
+    response1 = prompt_chatgpt(prompt)
 
     # second call
     logging.info("[CALL 2] prompt_chatgpt -> response2")
-    response2 = json.loads(prompt_chatgpt(prompt))
+    response2 = prompt_chatgpt(prompt)
 
     with open("validation/checksum_comparison.txt", "w") as comparison_file:
         comparison_file.write("Response 1:\n")
@@ -144,9 +159,8 @@ def chatgpt_checksum(prompt: Prompt) -> list:
         prompt_mismatch = Prompt(prompt.text, mismatch_qa)
 
         logging.info("[CALL 3] prompt_chatgpt -> response3 (mismatch-only)")
-        raw3 = prompt_chatgpt(prompt_mismatch)
-        logging.info("[CALL 3 OUTPUT] %s", raw3)
-        new_response = json.loads(raw3)
+        new_response = prompt_chatgpt(prompt_mismatch)
+        logging.info("[CALL 3 OUTPUT] %s", json.dumps(new_response, indent=4))
 
         verified_qa += checksum_three(response1, response2, new_response)
     return verified_qa
@@ -167,32 +181,30 @@ def load_simple_prompts() -> Prompt:
 
     return Prompt(simple_qs_prompt, simple_qs_res)
 
-def load_multistep_prompts() -> list[list]:
-    logging.info("Executing multistep prompts...")
+# Load the schedule based prompts into a list of Prompt objects
+def load_schedule_prompts() -> tuple[Prompt, Prompt]:
+    logging.info("Loading schedule prompts...")
 
-    prompt_dir = os.path.join("prompts", "multistep")
+    prompt_dir = os.path.join("prompts", "schedules")
 
     multistep_prompts = []
     p = Path(prompt_dir)
 
-    # Each dir represents a multistep prompt chain
-    for dir in p.iterdir():
-        uniq_prompts = dir.glob("*.txt")
-        prompt_chain = []
-        for txt in uniq_prompts:
-            json_path = txt.with_suffix('.json')
-            if not json_path.exists():
-                logging.info(f"Warning: JSON file {json_path} does not exist for prompt {txt}")
-            with open(txt, "r") as file:
-                prompt_text = file.read()
-            with open(json_path, "r") as file:
-                prompt_json = json.loads(file.read())
-            order = prompt_json['order']
-            prompt_chain.append({"order": order, "prompt": Prompt(prompt_text, prompt_json['res_obj'])})
-            prompt_chain.sort(key=lambda x: x["order"])
-        multistep_prompts.append(prompt_chain)
-    return multistep_prompts
+    # Each dir represents a schedule prompts
+    with open(os.path.join(prompt_dir, "get_schedule_chart_titles.txt"), "r") as prompt_text:
+        get_sched_text = prompt_text.read()
+    with open(os.path.join(prompt_dir, "get_schedule_chart_titles.json"), "r") as prompt_res:
+        get_sched_res = json.loads(prompt_res.read())
+    get_sched_prompt = Prompt(get_sched_text, get_sched_res)
 
+    with open(os.path.join(prompt_dir, "each_schedule_info.txt"), "r") as prompt_text:
+        each_sched_text = prompt_text.read()
+    with open(os.path.join(prompt_dir, "each_schedule_info.json"), "r") as prompt_res:
+        each_sched_res = json.loads(prompt_res.read())
+    each_sched_prompt = Prompt(each_sched_text, each_sched_res)
+    
+    return get_sched_prompt, each_sched_prompt
+    
 if __name__ == "__main__":
     log_path = setup_logger()
     logging.info("Starting script...")
@@ -200,16 +212,11 @@ if __name__ == "__main__":
     # Configuration
     logging.info("Loading configuration...")
     load_dotenv()
-    OPENAI_API_KEY=os.getenv('OPENAI_API_KEY')
-    FILE_ID=os.getenv('FILE_ID')
-    MODEL=os.getenv('MODEL')
+    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+    FILE_ID = os.getenv('FILE_ID')
+    MODEL = os.getenv('MODEL') or "gpt-5-nano"  # default to gpt-5-nano if MODEL is not set
     logging.info(f"Configuration loaded: MODEL={MODEL}")
     client = OpenAI(api_key=OPENAI_API_KEY)
-
-    # pdf_path = "Wedgewood Permit Set - Mechanical.pdf"
-    # create_file(pdf_path)
-
-    # Loading prompt
 
     # Simple question prompts
     simple_prompts = load_simple_prompts()
@@ -219,25 +226,35 @@ if __name__ == "__main__":
         for qa in verified_qs:
             output_file.write(f"Q: {qa['Question']}\nA: {qa['Answer']}\n\n")
 
-    # Multistep Prompt
-    multistep_prompts = load_multistep_prompts()
-    multistep_QAs = []
+    # Schedule Title Prompts
+    answers = []
+    get_sched_prompt, each_sched_prompt = load_schedule_prompts()
+    sched_titles_res = prompt_chatgpt(get_sched_prompt)
 
-    for prompt_chain in multistep_prompts:
-        answer = ''
-        while len(prompt_chain) > 0:
-            current_prompt = prompt_chain.pop(0)
-            current_prompt = current_prompt["prompt"]
-            if answer != '' and type(answer) == list:
-                current_prompt.text = current_prompt.text.replace("{prev_answer}", answer[0]['Answer'])
-            answer = chatgpt_checksum(current_prompt)
-            multistep_QAs.append(answer)
+    logging.info(f"Schedule Chart Titles: {sched_titles_res}")
+    if type(sched_titles_res) == list and len(sched_titles_res) == 1:
+        sched_titles =  sched_titles_res[0]
+        answers.append(sched_titles)
+    else:
+        exception_msg = f"Unexpected format for schedule titles response: {sched_titles_res}"
+        logging.error(exception_msg)
+        raise ValueError(exception_msg)
+    titles = sched_titles['Answer'] if 'Answer' in sched_titles else []
 
-    logging.info("Multistep Questions Response:")
-    logging.info(multistep_QAs)
+    #titles = titles[:3]
+    if type(titles) == list:
+        for title in titles:
+            logging.info(f"Processing schedule: {title}")
+            title_sched_prompt = each_sched_prompt.text.replace("{Schedule Title}", title)
+            sched_prompt = Prompt(title_sched_prompt, each_sched_prompt.res)
+            title_answers = prompt_chatgpt(sched_prompt)
+            for answer in title_answers:
+                logging.info(f"Answer for {title}: {answer}")
+                answers.append(answer)
+
+    logging.info("Schedule Responses:")
+    logging.info(answers)
     with open("Final Output.txt", "a") as output_file:
-        for prompt_chain in multistep_QAs:
-            logging.info(f"prompt_chain: {prompt_chain}")
-            for qa in prompt_chain:
-                logging.info(f"qa: {qa}")
-                output_file.write(f"Q: {qa['Question']}\nA: {qa['Answer']}\n\n")
+        for qa in answers:
+            logging.info(f"qa: {qa}")
+            output_file.write(f"Q: {qa['Question']}\nA: {qa['Answer']}\n\n")

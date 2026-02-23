@@ -1,0 +1,10 @@
+[   
+    {
+        "Question": "What is the total count of units in the {Schedule Title}?",
+        "Answer": ""
+    },
+    {
+        "Question": "What is the total CFM of all the units in the {Schedule Title}?",
+        "Answer": ""
+    }
+]
